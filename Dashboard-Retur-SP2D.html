@@ -1,0 +1,986 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dashboard Monitoring Retur SP2D</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<style>
+  :root{
+    --ink:#16283F;
+    --ink-soft:#3A4A5C;
+    --paper:#EEF0EA;
+    --card:#FFFFFF;
+    --line:#D9D5C6;
+    --line-soft:#E4E1D5;
+    --stamp:#A6332E;
+    --stamp-soft:#F3E1DF;
+    --brass:#AD8636;
+    --brass-soft:#F1E8D3;
+    --green:#3F7A5B;
+    --green-soft:#DEEBE3;
+    --muted:#5F6A73;
+    --font-head:'IBM Plex Sans',sans-serif;
+    --font-mono:'IBM Plex Mono',monospace;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background:var(--paper);
+    font-family:var(--font-head);
+    color:var(--ink);
+    -webkit-font-smoothing:antialiased;
+  }
+  body::before{
+    content:"";
+    position:fixed;
+    inset:0;
+    pointer-events:none;
+    background-image:
+      radial-gradient(circle, rgba(22,40,63,0.045) 1px, transparent 1px);
+    background-size:18px 18px;
+    z-index:0;
+  }
+  #app{position:relative;z-index:1;max-width:1180px;margin:0 auto;padding:28px 24px 60px;}
+
+  /* ===== HEADER ===== */
+  header.top{
+    display:flex;
+    justify-content:space-between;
+    align-items:flex-end;
+    gap:20px;
+    border-bottom:2px solid var(--ink);
+    padding-bottom:18px;
+    margin-bottom:22px;
+    flex-wrap:wrap;
+  }
+  .eyebrow{
+    font-family:var(--font-mono);
+    font-size:11px;
+    letter-spacing:.14em;
+    text-transform:uppercase;
+    color:var(--stamp);
+    font-weight:600;
+    margin-bottom:6px;
+  }
+  h1{
+    font-size:26px;
+    margin:0 0 6px;
+    font-weight:700;
+    letter-spacing:-0.01em;
+  }
+  .subtitle{color:var(--muted);font-size:13.5px;max-width:560px;line-height:1.5;}
+  .headmeta{
+    font-family:var(--font-mono);
+    font-size:11.5px;
+    color:var(--ink-soft);
+    text-align:right;
+    line-height:1.7;
+  }
+  .headmeta b{color:var(--ink);}
+  .actions{display:flex;gap:10px;margin-top:12px;flex-wrap:wrap;align-items:center;}
+  .upload-btn, button#resetData, button#downloadPdf{
+    font-family:var(--font-mono);
+    font-size:12px;
+    font-weight:600;
+    letter-spacing:.04em;
+    text-transform:uppercase;
+    border:none;
+    padding:11px 18px;
+    cursor:pointer;
+    display:inline-flex;
+    align-items:center;
+    gap:8px;
+    transition:background .15s ease, transform .1s ease, color .15s ease;
+  }
+
+  .upload-btn{
+    background:var(--ink);
+    color:#fff;
+    border:1px solid var(--ink) !important;
+  }
+  .upload-btn:hover{background:var(--stamp); border-color:var(--stamp) !important;}
+  .upload-btn svg{width:14px;height:14px;}
+  button#downloadPdf{
+    background:#fff;color:var(--ink);border:1px solid var(--ink);display:none;
+  }
+  button#downloadPdf.show{display:inline-flex;}
+  button#downloadPdf:hover{background:var(--ink);color:#fff;}
+  button#downloadPdf:disabled{opacity:.55;cursor:progress;}
+  button#downloadPdf svg{width:14px;height:14px;}
+
+  button#resetData{
+    background:transparent;
+    color:var(--muted);
+    border:1px dashed var(--line) !important;
+    display:none;
+  }
+  button#resetData:hover{color:var(--stamp);border-color:var(--stamp) !important;}
+  button#resetData.show{display:inline-flex;}
+
+  .data-badge{
+    font-family:var(--font-mono);
+    font-size:11px;
+    color:var(--muted);
+    display:flex;
+    align-items:center;
+    gap:6px;
+  }
+  .data-badge .dot{width:7px;height:7px;border-radius:50%;background:var(--brass);}
+  .data-badge.uploaded .dot{background:var(--green);}
+
+  #uploadError{
+    display:none;
+    background:var(--stamp-soft);
+    border:1px solid var(--stamp);
+    color:var(--stamp);
+    font-size:12.5px;
+    padding:12px 16px;
+    margin-bottom:20px;
+    line-height:1.6;
+  }
+  #uploadError.show{display:block;}
+  #uploadError b{font-family:var(--font-mono);}
+
+  /* ===== EMPTY STATE ===== */
+  #emptyState{
+    text-align:center;
+    padding:90px 24px 100px;
+    border:1px dashed var(--line);
+    background:var(--card);
+  }
+  #emptyState .stamp-icon{
+    width:56px;height:56px;
+    margin:0 auto 18px;
+    border:2px dashed var(--brass);
+    border-radius:50%;
+    display:flex;align-items:center;justify-content:center;
+    color:var(--brass);
+    transform:rotate(-4deg);
+  }
+  #emptyState .stamp-icon svg{width:26px;height:26px;}
+  #emptyState h2{font-size:17px;margin:0 0 8px;color:var(--ink);}
+  #emptyState p{font-size:13px;color:var(--muted);max-width:420px;margin:0 auto 22px;line-height:1.6;}
+  #emptyState .upload-btn{padding:12px 22px;}
+  #dashboardContent{display:none;}
+
+  /* ===== KPI STRIP ===== */
+  .kpi-grid{
+    display:grid;
+    grid-template-columns:repeat(6,1fr);
+    gap:12px;
+    margin-bottom:26px;
+  }
+  .kpi{
+    background:var(--card);
+    border:1px solid var(--line);
+    border-top:3px solid var(--ink);
+    padding:14px 14px 12px;
+    position:relative;
+  }
+  .kpi.alert{border-top-color:var(--stamp);}
+  .kpi.good{border-top-color:var(--green);}
+  .kpi-label{
+    font-size:10.5px;
+    text-transform:uppercase;
+    letter-spacing:.07em;
+    color:var(--muted);
+    font-weight:600;
+    margin-bottom:8px;
+  }
+  .kpi-value{
+    font-family:var(--font-mono);
+    font-size:22px;
+    font-weight:600;
+    color:var(--ink);
+    line-height:1.1;
+  }
+  .kpi.alert .kpi-value{color:var(--stamp);}
+  .kpi.good .kpi-value{color:var(--green);}
+  .kpi-sub{font-size:10.5px;color:var(--muted);margin-top:5px;}
+
+  /* ===== SECTION HEADERS ===== */
+  .section-title{
+    display:flex;
+    align-items:baseline;
+    gap:10px;
+    margin:34px 0 14px;
+  }
+  .section-title .num{
+    font-family:var(--font-mono);
+    font-size:11px;
+    color:var(--stamp);
+    font-weight:700;
+    border:1px solid var(--stamp);
+    padding:2px 6px;
+  }
+  .section-title h2{font-size:16px;margin:0;font-weight:700;}
+  .section-title .rule{flex:1;height:1px;background:var(--line);}
+
+  /* ===== INSIGHT PANEL ===== */
+  .insight-panel{
+    background:var(--card);
+    border:1px solid var(--line);
+    padding:20px 22px;
+    position:relative;
+  }
+  .insight-panel::before{
+    content:"ANALISIS";
+    position:absolute;
+    top:14px;
+    right:16px;
+    font-family:var(--font-mono);
+    font-size:10px;
+    letter-spacing:.14em;
+    color:var(--brass);
+    border:1px dashed var(--brass);
+    padding:3px 8px;
+    transform:rotate(2deg);
+  }
+  .insight-list{
+    list-style:none;
+    margin:0;
+    padding:0;
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:12px 28px;
+  }
+  .insight-list li{
+    font-size:13px;
+    line-height:1.55;
+    color:var(--ink-soft);
+    padding-left:16px;
+    position:relative;
+  }
+  .insight-list li::before{
+    content:"—";
+    position:absolute;
+    left:0;
+    color:var(--stamp);
+    font-weight:700;
+  }
+  .insight-list b{color:var(--ink);font-family:var(--font-mono);}
+
+  /* ===== CHART GRID ===== */
+  .chart-grid{display:grid;grid-template-columns:1.4fr 1fr;gap:14px;margin-bottom:6px;}
+  .chart-grid.thirds{grid-template-columns:1fr 1fr 1fr;}
+  .card{
+    background:var(--card);
+    border:1px solid var(--line);
+    padding:16px 16px 10px;
+  }
+  .card h3{
+    font-size:12px;
+    text-transform:uppercase;
+    letter-spacing:.05em;
+    margin:0 0 12px;
+    color:var(--ink-soft);
+    font-weight:600;
+  }
+  .card .chart-wrap{position:relative;height:230px;}
+  .card .chart-wrap.short{height:190px;}
+
+  /* ===== TABLE ===== */
+  table.satker-table{
+    width:100%;
+    border-collapse:collapse;
+    font-size:12.5px;
+  }
+  table.satker-table th{
+    text-align:left;
+    font-family:var(--font-mono);
+    font-size:10.5px;
+    text-transform:uppercase;
+    letter-spacing:.05em;
+    color:var(--muted);
+    border-bottom:2px solid var(--ink);
+    padding:8px 10px;
+    font-weight:600;
+  }
+  table.satker-table td{
+    padding:8px 10px;
+    border-bottom:1px solid var(--line-soft);
+    color:var(--ink-soft);
+  }
+  table.satker-table td.num{font-family:var(--font-mono);text-align:right;color:var(--ink);}
+  table.satker-table tr:hover td{background:#FAFAF6;}
+  .bar-cell{display:flex;align-items:center;gap:8px;}
+  .bar-track{flex:1;height:6px;background:var(--line-soft);position:relative;max-width:90px;}
+  .bar-fill{height:100%;background:var(--stamp);}
+
+  footer.foot{
+    margin-top:40px;
+    padding-top:16px;
+    border-top:1px solid var(--line);
+    font-family:var(--font-mono);
+    font-size:10.5px;
+    color:var(--muted);
+    display:flex;
+    justify-content:space-between;
+  }
+
+  @media (max-width:900px){
+    .kpi-grid{grid-template-columns:repeat(3,1fr);}
+    .chart-grid, .chart-grid.thirds{grid-template-columns:1fr;}
+    .insight-list{grid-template-columns:1fr;}
+    header.top{flex-direction:column;align-items:flex-start;}
+    .headmeta{text-align:left;}
+  }
+
+  /* ===== LOGIN ===== */
+  #loginScreen{position:fixed;inset:0;z-index:10;display:flex;align-items:center;justify-content:center;padding:20px;background:var(--paper);}
+  #loginScreen.hidden{display:none;}
+  .login-card{width:100%;max-width:380px;background:var(--card);border:1px solid var(--line);border-top:3px solid var(--ink);padding:28px 26px 24px;}
+  .login-card .eyebrow{margin-bottom:8px;}
+  .login-card h1{font-size:20px;margin:0 0 6px;}
+  .login-card p{font-size:12.5px;color:var(--muted);margin:0 0 20px;line-height:1.5;}
+  .login-card label{display:block;font-family:var(--font-mono);font-size:10.5px;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);font-weight:600;margin-bottom:5px;}
+  .login-card input{width:100%;font-family:var(--font-mono);font-size:14px;padding:10px 12px;border:1px solid var(--line);background:#fff;color:var(--ink);margin-bottom:14px;}
+  .login-card input:focus{outline:2px solid var(--ink);outline-offset:-1px;}
+  .login-card button{width:100%;font-family:var(--font-mono);font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;background:var(--ink);color:#fff;border:none;padding:12px;cursor:pointer;}
+  .login-card button:hover{background:var(--stamp);}
+  .login-card button:disabled{opacity:.55;cursor:not-allowed;}
+  #loginMsg{min-height:18px;font-size:12px;color:var(--stamp);margin:0 0 12px;line-height:1.4;}
+  #app{display:none;}
+  button#logoutBtn{font-family:var(--font-mono);font-size:12px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;background:transparent;color:var(--muted);border:1px dashed var(--line);padding:11px 18px;cursor:pointer;}
+  button#logoutBtn:hover{color:var(--stamp);border-color:var(--stamp);}
+</style>
+</head>
+<body>
+<div id="loginScreen">
+  <form class="login-card" id="loginForm" autocomplete="off">
+    <div class="eyebrow">Monitoring Retur SP2D · SPAN‑EXT</div>
+    <h1>Masuk ke Aplikasi</h1>
+    <p>Akses terbatas untuk pegawai KPPN Takengon. Masukkan user dan password untuk melanjutkan.</p>
+    <label for="loginUser">User</label>
+    <input id="loginUser" type="text" autocomplete="username" required>
+    <label for="loginPass">Password</label>
+    <input id="loginPass" type="password" autocomplete="current-password" required>
+    <div id="loginMsg"></div>
+    <button type="submit" id="loginBtn">Masuk</button>
+  </form>
+</div>
+
+<div id="app">
+
+  <header class="top">
+    <div>
+      <div class="eyebrow">Monitoring Retur SP2D · SPAN‑EXT</div>
+      <h1>Dashboard Analitik Retur SP2D</h1>
+      <div class="subtitle">Rekapitulasi dan analisis SP2D yang diretur bank penerima, mencakup status penyelesaian, penyebab retur, dan waktu tindak lanjut pada lingkup KPPN Takengon.</div>
+      <div class="actions">
+        <label class="upload-btn" for="fileInput">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 16V4m0 0L7 9m5-5l5 5M4 20h16"/></svg>
+          Upload Excel
+        </label>
+        <input type="file" id="fileInput" accept=".xlsx,.xls" hidden>
+        <button id="downloadPdf">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v12m0 0l-4-4m4 4l4-4M4 19h16"/></svg>
+          Unduh Laporan PDF
+        </button>
+        <button id="resetData">Kosongkan Data</button>
+        <button id="logoutBtn">Keluar</button>
+        <span class="data-badge" id="dataBadge"><span class="dot"></span><span id="dataBadgeText">Belum ada data</span></span>
+      </div>
+    </div>
+    <div class="headmeta">
+      Periode data: <b id="metaPeriode">—</b><br>
+      Jumlah satuan kerja: <b id="metaSatker">—</b><br>
+      Dicetak: <b id="metaTanggal">—</b>
+    </div>
+  </header>
+
+  <div id="uploadError"></div>
+
+  <div id="emptyState">
+    <div class="stamp-icon">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 16V4m0 0L7 9m5-5l5 5M4 20h16"/></svg>
+    </div>
+    <h2>Belum ada data untuk dianalisis</h2>
+    <p>Unggah file Excel Monitoring Retur SP2D (format kolom sama persis dengan template SPAN‑EXT) untuk menampilkan ringkasan, grafik, dan analisis otomatis di sini.</p>
+    <label class="upload-btn" for="fileInput">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 16V4m0 0L7 9m5-5l5 5M4 20h16"/></svg>
+      Upload Excel
+    </label>
+  </div>
+
+  <div id="dashboardContent">
+
+  <section class="kpi-grid pdf-block" id="kpiGrid"></section>
+
+  <div class="pdf-block">
+  <div class="section-title"><span class="num">01</span><h2>Ringkasan Analisis</h2><div class="rule"></div></div>
+  <div class="insight-panel">
+    <ul class="insight-list" id="insightList"></ul>
+  </div>
+  </div>
+
+  <div class="pdf-block">
+  <div class="section-title"><span class="num">02</span><h2>Tren Bulanan</h2><div class="rule"></div></div>
+  <div class="chart-grid">
+    <div class="card">
+      <h3>Jumlah &amp; Nilai Retur per Bulan</h3>
+      <div class="chart-wrap"><canvas id="chartMonthly"></canvas></div>
+    </div>
+    <div class="card">
+      <h3>Status Penyelesaian Retur</h3>
+      <div class="chart-wrap"><canvas id="chartStatus"></canvas></div>
+    </div>
+  </div>
+  </div>
+
+  <div class="pdf-block">
+  <div class="section-title"><span class="num">03</span><h2>Penyebab &amp; Waktu Penyelesaian</h2><div class="rule"></div></div>
+  <div class="chart-grid">
+    <div class="card">
+      <h3>Alasan Retur</h3>
+      <div class="chart-wrap"><canvas id="chartAlasan"></canvas></div>
+    </div>
+    <div class="card">
+      <h3>Distribusi Waktu Penyelesaian</h3>
+      <div class="chart-wrap"><canvas id="chartWaktu"></canvas></div>
+    </div>
+  </div>
+  </div>
+
+  <div class="pdf-block">
+  <div class="section-title"><span class="num">04</span><h2>Pihak Bank &amp; Sumber Dana</h2><div class="rule"></div></div>
+  <div class="chart-grid thirds">
+    <div class="card">
+      <h3>Bank Pembayar</h3>
+      <div class="chart-wrap short"><canvas id="chartBankBayar"></canvas></div>
+    </div>
+    <div class="card">
+      <h3>Bank Penerima</h3>
+      <div class="chart-wrap short"><canvas id="chartBankTerima"></canvas></div>
+    </div>
+    <div class="card">
+      <h3>Sumber Dana</h3>
+      <div class="chart-wrap short"><canvas id="chartSumber"></canvas></div>
+    </div>
+  </div>
+  </div>
+
+  <div class="pdf-block">
+  <div class="section-title"><span class="num">05</span><h2>Rekap per Satuan Kerja</h2><div class="rule"></div></div>
+  <div class="card" style="padding-bottom:16px;">
+    <table class="satker-table">
+      <thead>
+        <tr>
+          <th>Satuan Kerja</th>
+          <th style="text-align:right;">Jumlah Retur</th>
+          <th>Proporsi</th>
+          <th style="text-align:right;">Nilai Retur (Rp)</th>
+        </tr>
+      </thead>
+      <tbody id="satkerBody"></tbody>
+    </table>
+  </div>
+  </div>
+
+  <footer class="foot pdf-block">
+    <span>Sumber: Monitoring_Retur_SP2D — SPAN‑EXT</span>
+    <span id="footNote">dibuat otomatis</span>
+  </footer>
+
+  </div>
+
+</div>
+
+<script>
+
+const PALETTE = {
+  ink:'#16283F', inkSoft:'#3A4A5C', stamp:'#A6332E', stampSoft:'#D98A85',
+  brass:'#AD8636', brassSoft:'#DCC07E', green:'#3F7A5B', greenSoft:'#8FBBA3',
+  muted:'#8C93A0', paperLine:'#D9D5C6'
+};
+const CATEGORICAL = ['#16283F','#A6332E','#AD8636','#3F7A5B','#5C7A99','#8C6E4E','#7A8C5C','#B0505A'];
+
+const REQUIRED_COLUMNS = ['NAMA SATKER','TGL SP2D','JUMLAH','ALASAN RETUR','BANK PEMBAYAR','BANK PENERIMA','SUMBER DANA','STATUS RETUR','WAKTU PENYELESAIAN RETUR'];
+
+function fmtRp(n){
+  return 'Rp' + Math.round(n).toLocaleString('id-ID');
+}
+function fmtRpShort(n){
+  if(n>=1e9) return 'Rp'+(n/1e9).toFixed(1)+'M';
+  if(n>=1e6) return 'Rp'+(n/1e6).toFixed(0)+'jt';
+  return 'Rp'+n.toLocaleString('id-ID');
+}
+function monthLabel(ym){
+  const [y,m]=ym.split('-');
+  const names=['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des'];
+  return names[parseInt(m,10)-1]+" '"+y.slice(2);
+}
+function pad2(n){ return n<10 ? '0'+n : ''+n; }
+
+Chart.defaults.font.family = "'IBM Plex Sans', sans-serif";
+Chart.defaults.font.size = 11;
+Chart.defaults.color = PALETTE.inkSoft;
+
+/* ================= ANALYSIS ENGINE (dipakai untuk file yang diupload) ================= */
+
+function toDate(v){
+  if(v instanceof Date && !isNaN(v)) return v;
+  if(typeof v === 'number'){
+    // serial tanggal Excel
+    const d = XLSX.SSF.parse_date_code(v);
+    if(d) return new Date(d.y, d.m-1, d.d);
+  }
+  if(typeof v === 'string' && v.trim()){
+    const d = new Date(v);
+    if(!isNaN(d)) return d;
+  }
+  return null;
+}
+function parseHari(v){
+  if(v===null || v===undefined) return null;
+  const m = String(v).match(/\d+/);
+  return m ? parseInt(m[0],10) : null;
+}
+function bucketWaktu(h){
+  if(h===null) return 'Belum Selesai';
+  if(h<=3) return '0-3 hari';
+  if(h<=7) return '4-7 hari';
+  if(h<=14) return '8-14 hari';
+  return '>14 hari';
+}
+function countBy(rows, key){
+  const map = new Map();
+  rows.forEach(r=>{
+    const v = (r[key]===null||r[key]===undefined||r[key]==='') ? '(kosong)' : String(r[key]).trim();
+    map.set(v, (map.get(v)||0)+1);
+  });
+  return [...map.entries()].sort((a,b)=>b[1]-a[1]).map(([label,value])=>({label,value}));
+}
+
+function buildAnalysis(rows){
+  // validasi kolom wajib
+  const cols = Object.keys(rows[0] || {});
+  const missing = REQUIRED_COLUMNS.filter(c=>!cols.includes(c));
+  if(missing.length){
+    throw new Error('Format file tidak sesuai. Kolom berikut tidak ditemukan: ' + missing.join(', ') + '. Pastikan header sama persis dengan template Monitoring Retur SP2D.');
+  }
+
+  const clean = rows.filter(r=>r['JUMLAH']!==null && r['JUMLAH']!==undefined && r['TGL SP2D']!==null);
+  if(!clean.length){
+    throw new Error('Tidak ada baris data yang valid (kolom TGL SP2D / JUMLAH kosong).');
+  }
+
+  // monthly
+  const monthlyMap = new Map();
+  clean.forEach(r=>{
+    const d = toDate(r['TGL SP2D']);
+    if(!d) return;
+    const key = d.getFullYear()+'-'+pad2(d.getMonth()+1);
+    if(!monthlyMap.has(key)) monthlyMap.set(key, {BULAN:key, jumlah:0, nilai:0});
+    const m = monthlyMap.get(key);
+    m.jumlah += 1;
+    m.nilai += Number(r['JUMLAH'])||0;
+  });
+  const monthly = [...monthlyMap.values()].sort((a,b)=>a.BULAN.localeCompare(b.BULAN));
+
+  // satker
+  const satkerMap = new Map();
+  clean.forEach(r=>{
+    const key = (r['NAMA SATKER']||'(kosong)').trim();
+    if(!satkerMap.has(key)) satkerMap.set(key, {'NAMA SATKER':key, jumlah:0, nilai:0});
+    const s = satkerMap.get(key);
+    s.jumlah += 1;
+    s.nilai += Number(r['JUMLAH'])||0;
+  });
+  const satker = [...satkerMap.values()].sort((a,b)=>b.jumlah-a.jumlah);
+
+  // waktu
+  const waktuCounts = new Map();
+  clean.forEach(r=>{
+    const b = bucketWaktu(parseHari(r['WAKTU PENYELESAIAN RETUR']));
+    waktuCounts.set(b, (waktuCounts.get(b)||0)+1);
+  });
+  const waktu = [...waktuCounts.entries()].map(([label,value])=>({label,value}));
+
+  const waktuHariArr = clean.map(r=>parseHari(r['WAKTU PENYELESAIAN RETUR'])).filter(v=>v!==null);
+  const avgWaktu = waktuHariArr.length ? waktuHariArr.reduce((a,b)=>a+b,0)/waktuHariArr.length : 0;
+  const maxWaktu = waktuHariArr.length ? Math.max(...waktuHariArr) : 0;
+
+  const totalNilai = clean.reduce((a,r)=>a+(Number(r['JUMLAH'])||0),0);
+  const totalNilaiPengganti = clean.reduce((a,r)=>a+(Number(r['JUMLAH SP2D PENGGANTI'])||0),0);
+  const sudahProses = clean.filter(r=>String(r['STATUS RETUR']||'').trim().toUpperCase()==='SUDAH PROSES').length;
+
+  return {
+    summary:{
+      total_retur: clean.length,
+      total_nilai: totalNilai,
+      total_nilai_pengganti: totalNilaiPengganti,
+      sudah_proses: sudahProses,
+      belum_proses: clean.length - sudahProses,
+      persen_selesai: Math.round((sudahProses/clean.length)*1000)/10,
+      avg_waktu: Math.round(avgWaktu*10)/10,
+      max_waktu: maxWaktu,
+      jumlah_satker: satker.length
+    },
+    monthly, satker, waktu,
+    status: countBy(clean,'STATUS RETUR'),
+    alasan: countBy(clean,'ALASAN RETUR'),
+    bank_bayar: countBy(clean,'BANK PEMBAYAR'),
+    bank_terima: countBy(clean,'BANK PENERIMA'),
+    sumber: countBy(clean,'SUMBER DANA'),
+  };
+}
+
+/* ================= RENDERING ================= */
+let charts = {};
+function destroyCharts(){
+  Object.values(charts).forEach(c=>c && c.destroy());
+  charts = {};
+}
+
+function renderMeta(DATA, sourceLabel){
+  document.getElementById('metaPeriode').textContent =
+    DATA.monthly.length ? (monthLabel(DATA.monthly[0].BULAN) + ' – ' + monthLabel(DATA.monthly[DATA.monthly.length-1].BULAN)) : '—';
+  document.getElementById('metaSatker').textContent = DATA.summary.jumlah_satker + ' satker';
+  document.getElementById('metaTanggal').textContent = new Date().toLocaleDateString('id-ID',{day:'numeric',month:'long',year:'numeric'});
+  document.getElementById('footNote').textContent = DATA.summary.total_retur + ' dokumen retur · ' + sourceLabel;
+}
+
+function renderKPI(DATA){
+  const s = DATA.summary;
+  const kpis = [
+    {label:'Total Dokumen Retur', value:s.total_retur, sub:'sepanjang periode data', cls:''},
+    {label:'Total Nilai Retur', value:fmtRpShort(s.total_nilai), sub:fmtRp(s.total_nilai), cls:''},
+    {label:'Sudah Diproses', value:s.persen_selesai+'%', sub:s.sudah_proses+' dari '+s.total_retur+' dokumen', cls:'good'},
+    {label:'Belum Diproses', value:s.belum_proses, sub:'perlu tindak lanjut segera', cls:'alert'},
+    {label:'Rata-rata Penyelesaian', value:s.avg_waktu+' hari', sub:'maks. '+s.max_waktu+' hari', cls:''},
+    {label:'Satuan Kerja Terdampak', value:s.jumlah_satker, sub:'satker dengan retur SP2D', cls:''},
+  ];
+  document.getElementById('kpiGrid').innerHTML = kpis.map(k=>`
+    <div class="kpi ${k.cls}">
+      <div class="kpi-label">${k.label}</div>
+      <div class="kpi-value">${k.value}</div>
+      <div class="kpi-sub">${k.sub}</div>
+    </div>
+  `).join('');
+}
+
+function renderInsights(DATA){
+  const s = DATA.summary;
+  if(!DATA.monthly.length || !DATA.alasan.length || !DATA.bank_bayar.length || !DATA.satker.length){
+    document.getElementById('insightList').innerHTML = '<li>Data tidak cukup untuk membuat analisis.</li>';
+    return;
+  }
+  const peakMonth = DATA.monthly.reduce((a,b)=>b.jumlah>a.jumlah?b:a);
+  const topAlasan = DATA.alasan[0];
+  const topBank = DATA.bank_bayar[0];
+  const topSatker = DATA.satker[0];
+  const pctTopAlasan = ((topAlasan.value/s.total_retur)*100).toFixed(0);
+  const pctTopBank = ((topBank.value/s.total_retur)*100).toFixed(0);
+  const pctTopSatker = ((topSatker.jumlah/s.total_retur)*100).toFixed(0);
+  const gtLama = DATA.waktu.find(w=>w.label==='>14 hari');
+
+  const insights = [
+    `Sebanyak <b>${topAlasan.value} dari ${s.total_retur} retur (${pctTopAlasan}%)</b> disebabkan oleh <b>"${topAlasan.label}"</b> — penyebab dominan yang perlu diselesaikan lewat validasi data rekening penerima di awal proses.`,
+    `Bulan <b>${monthLabel(peakMonth.BULAN)}</b> mencatat retur tertinggi dengan <b>${peakMonth.jumlah} dokumen</b> senilai <b>${fmtRpShort(peakMonth.nilai)}</b>.`,
+    `<b>${s.persen_selesai}%</b> retur sudah diproses ulang, namun <b>${s.belum_proses} dokumen</b> masih berstatus belum diproses dan berisiko melewati jatuh tempo penyelesaian.`,
+    `Bank pembayar <b>${topBank.label}</b> menyumbang <b>${pctTopBank}%</b> dari seluruh transaksi retur, menunjukkan konsentrasi risiko pada satu kanal pembayaran.`,
+    `Rata-rata waktu penyelesaian <b>${s.avg_waktu} hari</b>, tetapi <b>${gtLama ? gtLama.value : 0} kasus</b> baru selesai di atas 14 hari — berpotensi menghambat penerima manfaat.`,
+    `Satker <b>${topSatker['NAMA SATKER']}</b> mendominasi dengan <b>${topSatker.jumlah} retur (${pctTopSatker}%)</b>, menjadi prioritas utama pembinaan data rekening supplier.`,
+  ];
+  document.getElementById('insightList').innerHTML = insights.map(t=>`<li>${t}</li>`).join('');
+}
+
+function renderCharts(DATA){
+  destroyCharts();
+  const s = DATA.summary;
+
+  charts.monthly = new Chart(document.getElementById('chartMonthly'), {
+    data:{
+      labels: DATA.monthly.map(m=>monthLabel(m.BULAN)),
+      datasets:[
+        {type:'bar', label:'Jumlah Retur', data: DATA.monthly.map(m=>m.jumlah), backgroundColor: PALETTE.stampSoft, borderColor: PALETTE.stamp, borderWidth:1, yAxisID:'y', order:2, borderRadius:2, maxBarThickness:34},
+        {type:'line', label:'Nilai Retur (Rp)', data: DATA.monthly.map(m=>m.nilai), borderColor: PALETTE.ink, backgroundColor: PALETTE.ink, yAxisID:'y1', order:1, tension:.3, pointRadius:3, pointBackgroundColor: PALETTE.ink, borderWidth:2}
+      ]
+    },
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      interaction:{mode:'index', intersect:false},
+      plugins:{legend:{position:'bottom', labels:{boxWidth:10, padding:14}}},
+      scales:{
+        y:{position:'left', beginAtZero:true, title:{display:true,text:'Jumlah'}, grid:{color:PALETTE.paperLine}},
+        y1:{position:'right', beginAtZero:true, grid:{display:false}, ticks:{callback:v=>fmtRpShort(v)}},
+        x:{grid:{display:false}}
+      }
+    }
+  });
+
+  charts.status = new Chart(document.getElementById('chartStatus'), {
+    type:'doughnut',
+    data:{
+      labels: DATA.status.map(d=>d.label==='SUDAH PROSES'?'Sudah Diproses':(d.label==='BELUM PROSES'?'Belum Diproses':d.label)),
+      datasets:[{data: DATA.status.map(d=>d.value), backgroundColor: DATA.status.map(d=>d.label==='SUDAH PROSES'?PALETTE.green:PALETTE.stamp), borderWidth:2, borderColor:'#fff'}]
+    },
+    options:{
+      responsive:true, maintainAspectRatio:false, cutout:'62%',
+      plugins:{legend:{position:'bottom', labels:{boxWidth:10,padding:14}},
+        tooltip:{callbacks:{label:ctx=>ctx.label+': '+ctx.parsed+' ('+(ctx.parsed/s.total_retur*100).toFixed(0)+'%)'}}}
+    }
+  });
+
+  charts.alasan = new Chart(document.getElementById('chartAlasan'), {
+    type:'bar',
+    data:{
+      labels: DATA.alasan.map(d=>d.label.length>32? d.label.slice(0,32)+'…': d.label),
+      datasets:[{data: DATA.alasan.map(d=>d.value), backgroundColor: CATEGORICAL, borderRadius:2, maxBarThickness:26}]
+    },
+    options:{
+      indexAxis:'y', responsive:true, maintainAspectRatio:false,
+      plugins:{legend:{display:false}, tooltip:{callbacks:{title:(items)=>DATA.alasan[items[0].dataIndex].label}}},
+      scales:{x:{beginAtZero:true, grid:{color:PALETTE.paperLine}}, y:{grid:{display:false}}}
+    }
+  });
+
+  const waktuOrder = ['0-3 hari','4-7 hari','8-14 hari','>14 hari','Belum Selesai'];
+  const waktuSorted = waktuOrder.map(l=>DATA.waktu.find(w=>w.label===l)).filter(Boolean);
+  charts.waktu = new Chart(document.getElementById('chartWaktu'), {
+    type:'bar',
+    data:{
+      labels: waktuSorted.map(d=>d.label),
+      datasets:[{data: waktuSorted.map(d=>d.value), backgroundColor: PALETTE.brassSoft, borderColor: PALETTE.brass, borderWidth:1, borderRadius:2, maxBarThickness:44}]
+    },
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      plugins:{legend:{display:false}},
+      scales:{y:{beginAtZero:true, grid:{color:PALETTE.paperLine}, title:{display:true,text:'Jumlah kasus'}}, x:{grid:{display:false}}}
+    }
+  });
+
+  function miniDonut(elId, arr){
+    return new Chart(document.getElementById(elId), {
+      type:'doughnut',
+      data:{labels: arr.map(d=>d.label), datasets:[{data:arr.map(d=>d.value), backgroundColor: CATEGORICAL, borderWidth:2, borderColor:'#fff'}]},
+      options:{responsive:true, maintainAspectRatio:false, cutout:'56%',
+        plugins:{legend:{position:'bottom', labels:{boxWidth:9, font:{size:10}, padding:8}}}}
+    });
+  }
+  charts.bankBayar = miniDonut('chartBankBayar', DATA.bank_bayar);
+  charts.bankTerima = miniDonut('chartBankTerima', DATA.bank_terima);
+  charts.sumber = miniDonut('chartSumber', DATA.sumber);
+}
+
+function renderTable(DATA){
+  const s = DATA.summary;
+  const maxJumlah = Math.max(...DATA.satker.map(d=>d.jumlah));
+  document.getElementById('satkerBody').innerHTML = DATA.satker.map(d=>`
+    <tr>
+      <td>${d['NAMA SATKER']}</td>
+      <td class="num">${d.jumlah}</td>
+      <td><div class="bar-cell"><div class="bar-track"><div class="bar-fill" style="width:${(d.jumlah/maxJumlah*100).toFixed(0)}%"></div></div><span style="font-family:var(--font-mono);font-size:11px;color:var(--muted);">${(d.jumlah/s.total_retur*100).toFixed(0)}%</span></div></td>
+      <td class="num">${fmtRp(d.nilai)}</td>
+    </tr>
+  `).join('');
+}
+
+function renderAll(DATA, sourceLabel){
+  renderMeta(DATA, sourceLabel);
+  renderKPI(DATA);
+  renderInsights(DATA);
+  renderCharts(DATA);
+  renderTable(DATA);
+}
+
+function showError(msg){
+  const el = document.getElementById('uploadError');
+  el.innerHTML = '<b>Gagal memuat file.</b> ' + msg;
+  el.classList.add('show');
+}
+function clearError(){
+  document.getElementById('uploadError').classList.remove('show');
+}
+function setBadge(uploaded, text){
+  const badge = document.getElementById('dataBadge');
+  badge.classList.toggle('uploaded', uploaded);
+  document.getElementById('dataBadgeText').textContent = text;
+  document.getElementById('resetData').classList.toggle('show', uploaded);
+  document.getElementById('downloadPdf').classList.toggle('show', uploaded);
+}
+function showDashboard(show){
+  document.getElementById('dashboardContent').style.display = show ? 'block' : 'none';
+  document.getElementById('emptyState').style.display = show ? 'none' : 'block';
+}
+
+/* ---------- state awal: kosong, menunggu upload ---------- */
+showDashboard(false);
+
+/* ---------- UPLOAD EXCEL ---------- */
+document.getElementById('fileInput').addEventListener('change', function(e){
+  const file = e.target.files[0];
+  if(!file) return;
+  clearError();
+
+  const reader = new FileReader();
+  reader.onload = function(evt){
+    try{
+      const wb = XLSX.read(evt.target.result, {type:'array', cellDates:true});
+      const wsName = wb.SheetNames[0];
+      const ws = wb.Sheets[wsName];
+      const rows = XLSX.utils.sheet_to_json(ws, {defval:null});
+      if(!rows.length){
+        throw new Error('Sheet "'+wsName+'" tidak berisi data.');
+      }
+      const analyzed = buildAnalysis(rows);
+      renderAll(analyzed, 'file: ' + file.name);
+      setBadge(true, file.name);
+      showDashboard(true);
+    }catch(err){
+      console.error(err);
+      showError(err.message);
+    }finally{
+      e.target.value = '';
+    }
+  };
+  reader.onerror = function(){
+    showError('File tidak dapat dibaca. Pastikan formatnya .xlsx atau .xls.');
+  };
+  reader.readAsArrayBuffer(file);
+});
+
+document.getElementById('resetData').addEventListener('click', function(){
+  clearError();
+  setBadge(false, 'Belum ada data');
+  showDashboard(false);
+});
+
+/* ---------- PDF EXPORT ---------- */
+document.getElementById('downloadPdf').addEventListener('click', async function(){
+  const btn = this;
+  const label = btn.innerHTML;
+  btn.disabled = true;
+  btn.textContent = 'Menyiapkan PDF…';
+  const actions = document.querySelector('.actions');
+  try{
+    const { jsPDF } = window.jspdf;
+    const pdf = new jsPDF('p','pt','a4');
+    const pageW = pdf.internal.pageSize.getWidth();
+    const pageH = pdf.internal.pageSize.getHeight();
+    const M = 28, W = pageW - M*2, GAP = 10, BOTTOM = pageH - 34;
+    const paintBg = ()=>{ pdf.setFillColor(238,240,234); pdf.rect(0,0,pageW,pageH,'F'); };
+    paintBg();
+
+    const blocks = [document.querySelector('header.top'), ...document.querySelectorAll('#dashboardContent .pdf-block')];
+    actions.style.visibility = 'hidden';
+    let y = M;
+    for(const el of blocks){
+      const canvas = await html2canvas(el, {scale:2, backgroundColor:'#EEF0EA', useCORS:true});
+      let h = canvas.height * (W / canvas.width);
+      let w = W;
+      if(h > BOTTOM - M){ const k = (BOTTOM - M)/h; h *= k; w *= k; }
+      if(y + h > BOTTOM && y > M){ pdf.addPage(); paintBg(); y = M; }
+      pdf.addImage(canvas.toDataURL('image/jpeg',0.92), 'JPEG', M, y, w, h);
+      y += h + GAP;
+    }
+    actions.style.visibility = 'visible';
+
+    const total = pdf.internal.getNumberOfPages();
+    for(let i=1;i<=total;i++){
+      pdf.setPage(i);
+      pdf.setFontSize(8);
+      pdf.setTextColor(95,106,115);
+      pdf.text('Dashboard Analitik Retur SP2D', M, pageH-16);
+      pdf.text('Halaman '+i+' / '+total, pageW-M, pageH-16, {align:'right'});
+    }
+    pdf.save('Laporan-Retur-SP2D-'+new Date().toISOString().slice(0,10)+'.pdf');
+  }catch(err){
+    console.error(err);
+    alert('Gagal membuat PDF: '+err.message);
+  }finally{
+    actions.style.visibility = 'visible';
+    btn.disabled = false;
+    btn.innerHTML = label;
+  }
+});
+
+/* ---------- AUTENTIKASI (sisi klien) ---------- */
+const AUTH_HASH = "b88802c56baef74969b55fdcc2ede27a5a2779b22da66217f3a51b44f81b6c78";
+const AUTH_SALT = "reje-kppn-takengon";
+function sha256Fallback(s){
+  const K=[0x428a2f98,0x71374491,0xb5c0fbcf,0xe9b5dba5,0x3956c25b,0x59f111f1,0x923f82a4,0xab1c5ed5,0xd807aa98,0x12835b01,0x243185be,0x550c7dc3,0x72be5d74,0x80deb1fe,0x9bdc06a7,0xc19bf174,0xe49b69c1,0xefbe4786,0x0fc19dc6,0x240ca1cc,0x2de92c6f,0x4a7484aa,0x5cb0a9dc,0x76f988da,0x983e5152,0xa831c66d,0xb00327c8,0xbf597fc7,0xc6e00bf3,0xd5a79147,0x06ca6351,0x14292967,0x27b70a85,0x2e1b2138,0x4d2c6dfc,0x53380d13,0x650a7354,0x766a0abb,0x81c2c92e,0x92722c85,0xa2bfe8a1,0xa81a664b,0xc24b8b70,0xc76c51a3,0xd192e819,0xd6990624,0xf40e3585,0x106aa070,0x19a4c116,0x1e376c08,0x2748774c,0x34b0bcb5,0x391c0cb3,0x4ed8aa4a,0x5b9cca4f,0x682e6ff3,0x748f82ee,0x78a5636f,0x84c87814,0x8cc70208,0x90befffa,0xa4506ceb,0xbef9a3f7,0xc67178f2];
+  const b=new TextEncoder().encode(s), l=b.length, n=((l+9+63)>>6)<<6, m=new Uint8Array(n);
+  m.set(b); m[l]=0x80; new DataView(m.buffer).setUint32(n-4,l*8>>>0); new DataView(m.buffer).setUint32(n-8,Math.floor(l*8/4294967296));
+  let h=[0x6a09e667,0xbb67ae85,0x3c6ef372,0xa54ff53a,0x510e527f,0x9b05688c,0x1f83d9ab,0x5be0cd19];
+  const w=new Array(64), r=(x,c)=>(x>>>c)|(x<<(32-c));
+  for(let o=0;o<n;o+=64){
+    const dv=new DataView(m.buffer,o,64);
+    for(let i=0;i<16;i++) w[i]=dv.getUint32(i*4);
+    for(let i=16;i<64;i++){const a=r(w[i-15],7)^r(w[i-15],18)^(w[i-15]>>>3), c=r(w[i-2],17)^r(w[i-2],19)^(w[i-2]>>>10); w[i]=(w[i-16]+a+w[i-7]+c)|0;}
+    let [a,b2,c,d,e,f,g,hh]=h;
+    for(let i=0;i<64;i++){
+      const t1=(hh+(r(e,6)^r(e,11)^r(e,25))+((e&f)^(~e&g))+K[i]+w[i])|0;
+      const t2=((r(a,2)^r(a,13)^r(a,22))+((a&b2)^(a&c)^(b2&c)))|0;
+      hh=g;g=f;f=e;e=(d+t1)|0;d=c;c=b2;b2=a;a=(t1+t2)|0;
+    }
+    h=[(h[0]+a)|0,(h[1]+b2)|0,(h[2]+c)|0,(h[3]+d)|0,(h[4]+e)|0,(h[5]+f)|0,(h[6]+g)|0,(h[7]+hh)|0];
+  }
+  return h.map(x=>(x>>>0).toString(16).padStart(8,'0')).join('');
+}
+async function sha256Hex(s){
+  if(window.crypto && crypto.subtle){
+    try{
+      const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(s));
+      return [...new Uint8Array(buf)].map(b=>b.toString(16).padStart(2,'0')).join('');
+    }catch(e){}
+  }
+  return sha256Fallback(s);
+}
+function ssGet(k){ try{ return sessionStorage.getItem(k); }catch(e){ return null; } }
+function ssSet(k,v){ try{ sessionStorage.setItem(k,v); }catch(e){} }
+function ssDel(k){ try{ sessionStorage.removeItem(k); }catch(e){} }
+
+let failCount = 0, lockUntil = 0;
+function enterApp(){
+  document.getElementById('loginScreen').classList.add('hidden');
+  document.getElementById('app').style.display = 'block';
+}
+function leaveApp(){
+  ssDel('reje_auth');
+  document.getElementById('app').style.display = 'none';
+  document.getElementById('loginScreen').classList.remove('hidden');
+  document.getElementById('loginPass').value = '';
+  document.getElementById('loginMsg').textContent = '';
+}
+if(ssGet('reje_auth') === '1') enterApp();
+
+document.getElementById('loginForm').addEventListener('submit', async function(e){
+  e.preventDefault();
+  const msg = document.getElementById('loginMsg');
+  const now = Date.now();
+  if(now < lockUntil){
+    msg.textContent = 'Terlalu banyak percobaan. Coba lagi dalam ' + Math.ceil((lockUntil-now)/1000) + ' detik.';
+    return;
+  }
+  const u = document.getElementById('loginUser').value.trim();
+  const p = document.getElementById('loginPass').value;
+  const hash = await sha256Hex(AUTH_SALT + '|' + u + '|' + p);
+  if(hash === AUTH_HASH){
+    failCount = 0;
+    ssSet('reje_auth','1');
+    document.getElementById('loginPass').value = '';
+    msg.textContent = '';
+    enterApp();
+  }else{
+    failCount++;
+    if(failCount >= 5){
+      lockUntil = Date.now() + 60000; failCount = 0;
+      msg.textContent = 'Terlalu banyak percobaan. Coba lagi dalam 60 detik.';
+    }else{
+      msg.textContent = 'User atau password salah.';
+    }
+    document.getElementById('loginPass').value = '';
+  }
+});
+document.getElementById('logoutBtn').addEventListener('click', leaveApp);
+</script>
+</body>
+</html>
